@@ -12,3 +12,4 @@
 *.out
 
 conf/local.yaml
+RespText_*.txt
