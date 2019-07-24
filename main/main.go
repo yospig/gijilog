@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -81,14 +82,26 @@ func sendGCS(w io.Writer, gcsURI string) error {
 	return nil
 }
 
-// read config
 func init() {
 
-	// TODO use flag
+	// get flag
+	var fp string
+	flag.StringVar(&fp, "f", "", "Voice FilePath")
+	flag.Parse()
+	if len(fp) == 0 {
+		fmt.Println("Voice File not specified")
+		return
+	}
 
 	// default
 	conf["gs"] = "gs://xxxx/"
-	voiceFile = "xxxx.flac"
+	voiceFile, err := filepath.Abs(fp)	// "//User/local/xxxx.flac"
+	if err != nil{
+		log.Println("local File not found")
+		return
+	}
+	explodeFilePath(voiceFile)
+
 	localConf, _ = filepath.Abs("./conf/local.yaml") //"./conf/local.conf"
 
 	// local.confの読み込み
@@ -100,12 +113,18 @@ func init() {
 	voiceFileNameNonExt = getVoiceFileName(voiceFile) // something voice file
 }
 
+//
+func explodeFilePath(s string) {
+
+}
+
 // ファイルから拡張子を取り除いたファイル名を取得
 func getVoiceFileName(vf string) string {
 	slist := strings.Split(vf, ".")
 	return slist[0]
 }
 
+// load config
 func LoadConf() {
 	var c map[string]interface{}
 	buf, err := ioutil.ReadFile(localConf)
