@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cloud.google.com/go/storage"
 	"context"
 	"flag"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 	"gopkg.in/yaml.v2"
 
 	speech "cloud.google.com/go/speech/apiv1"
+	_ "cloud.google.com/go/storage"
 	speechpb "google.golang.org/genproto/googleapis/cloud/speech/v1"
 )
 
@@ -21,25 +23,89 @@ var conf = map[string]string{}
 
 var (
 	gsFile              string
+	projectId 	        string
+	bucketName			string
+	workDir				string
 	localConf   	    string
 	resultFile          string
+	localFile			string
 	voiceFile           string
 	voiceFileNameNonExt string
 )
 
 func main() {
-
-	// TODO: voice file upload
+	// voice file upload
+	result := uploadFile()
+	if result != nil {
+		log.Fatalf("failed to uploadFile: %v", result)
+	}
 
 	// create response file
 	file, _ := os.Create(fmt.Sprintf("RespText_%s.txt", voiceFileNameNonExt))
 	defer file.Close()
 
-	result := sendGCS(file, gsFile)
+	result = sendGCS(file, gsFile)
 	if result != nil {
 		log.Fatalf("failed to sendGCS: %v", result)
 	}
 }
+
+func init() {
+	// get flag
+	var fp string
+	flag.StringVar(&fp, "f", "", "Voice FilePath")
+	flag.Parse()
+	if exists(fp) == false {
+		fmt.Println("Voice File not specified")
+		return
+	}
+
+	// default
+	conf["gs"] = "gs://xxxx/"
+	vf, err := filepath.Abs(fp)	// "//User/local/xxxx.flac"
+	if err != nil{
+		log.Println("local File not found")
+		return
+	}
+
+	localFile = vf
+	voiceFile = filepath.Base(vf)
+
+	localConf, _ = filepath.Abs("./conf/local.yaml") //"./conf/local.conf"
+
+	// local.confの読み込み
+	LoadConf()
+
+	// TODO パス絶対値化
+	//apath, _ := filepath.Abs("./conf/local.conf")
+
+	voiceFileNameNonExt = getVoiceFileName(voiceFile) // something voice file
+}
+
+
+// upload voice file to Google Cloud Storage
+func uploadFile() error {
+	f, err := os.Open(localFile)
+	if err != nil{
+		return err
+	}
+	defer f.Close()
+
+	ctx := context.Background()
+	client, err := storage.NewClient(ctx)
+	if err != nil {
+		log.Fatalf("failed to create GS client: %v", err)
+	}
+	wc := client.Bucket(bucketName).Object(workDir + voiceFile).NewWriter(ctx)
+	if _, err = io.Copy(wc, f); err != nil {
+		return err
+	}
+	if err := wc.Close(); err != nil {
+		return err
+	}
+	return nil
+}
+
 
 func sendGCS(w io.Writer, gcsURI string) error {
 	// 空のコンテキストを生成。ゴールーチンのタイムアウト、キャンセルなどの実装に利用する。
@@ -50,7 +116,6 @@ func sendGCS(w io.Writer, gcsURI string) error {
 	if err != nil {
 		return err
 	}
-
 
 	// Detects speech in the audio file
 	// FLACエンコード、サンプリングレート44100Hz、日本語
@@ -82,47 +147,18 @@ func sendGCS(w io.Writer, gcsURI string) error {
 	return nil
 }
 
-func init() {
 
-	// get flag
-	var fp string
-	flag.StringVar(&fp, "f", "", "Voice FilePath")
-	flag.Parse()
-	if len(fp) == 0 {
-		fmt.Println("Voice File not specified")
-		return
-	}
-
-	// default
-	conf["gs"] = "gs://xxxx/"
-	voiceFile, err := filepath.Abs(fp)	// "//User/local/xxxx.flac"
-	if err != nil{
-		log.Println("local File not found")
-		return
-	}
-	explodeFilePath(voiceFile)
-
-	localConf, _ = filepath.Abs("./conf/local.yaml") //"./conf/local.conf"
-
-	// local.confの読み込み
-	LoadConf()
-
-	// TODO パス絶対値化
-	//apath, _ := filepath.Abs("./conf/local.conf")
-
-	voiceFileNameNonExt = getVoiceFileName(voiceFile) // something voice file
-}
-
-//
-func explodeFilePath(s string) {
-
+func exists(filename string) bool {
+	_, err := os.Stat(filename)
+	return err == nil
 }
 
 // ファイルから拡張子を取り除いたファイル名を取得
-func getVoiceFileName(vf string) string {
-	slist := strings.Split(vf, ".")
+func getVoiceFileName(f string) string {
+	slist := strings.Split(f, ".")
 	return slist[0]
 }
+
 
 // load config
 func LoadConf() {
@@ -141,4 +177,17 @@ func LoadConf() {
 	if ok == true {
 		gsFile = gs.(string) + voiceFile
 	}
+	id, ok := c["project-id"]
+	if ok == true {
+		projectId = id.(string)
+	}
+	bname, ok := c["bucket-name"]
+	if ok == true {
+		bucketName = bname.(string)
+	}
+	dir, ok := c["work-dir"]
+	if ok == true {
+		workDir = dir.(string)
+	}
+
 }
