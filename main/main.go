@@ -22,15 +22,15 @@ import (
 var conf = map[string]string{}
 
 var (
-	gsFile              string
-	projectId 	        string
-	bucketName			string
-	workDir				string
-	localConf   	    string
-	resultFile          string
-	localFile			string
-	voiceFile           string
-	voiceFileNameNonExt string
+	gsFile              string // URI, target file on Google Cloud Storage
+	projectId 	        string // GCP project ID
+	bucketName			string // Bucket Name of Google Cloud Storage
+	workDir				string // working directory name on Bucket
+	localConf   	    string // local conf file
+	resultFile          string //
+	localFile			string // original file path
+	voiceFile           string // original filename
+	voiceFileNameNonExt string // original filename without ext
 )
 
 func main() {
@@ -71,7 +71,7 @@ func init() {
 	localFile = vf
 	voiceFile = filepath.Base(vf)
 
-	localConf, _ = filepath.Abs("./conf/local.yaml") //"./conf/local.conf"
+	localConf, _ = filepath.Abs("./conf/config.yaml") //"./conf/config.conf"
 
 	// local.confの読み込み
 	LoadConf()
@@ -81,7 +81,6 @@ func init() {
 
 	voiceFileNameNonExt = getVoiceFileName(voiceFile) // something voice file
 }
-
 
 // upload voice file to Google Cloud Storage
 func uploadFile() error {
@@ -96,7 +95,7 @@ func uploadFile() error {
 	if err != nil {
 		log.Fatalf("failed to create GS client: %v", err)
 	}
-	wc := client.Bucket(bucketName).Object(workDir + voiceFile).NewWriter(ctx)
+	wc := client.Bucket(bucketName).Object(workDir +"/"+ voiceFile).NewWriter(ctx)
 	if _, err = io.Copy(wc, f); err != nil {
 		return err
 	}
@@ -173,10 +172,6 @@ func LoadConf() {
 		fmt.Fprintf(os.Stderr, "error: %s\n", err)
 		os.Exit(1)
 	}
-	gs, ok := c["gs"]
-	if ok == true {
-		gsFile = gs.(string) + voiceFile
-	}
 	id, ok := c["project-id"]
 	if ok == true {
 		projectId = id.(string)
@@ -188,6 +183,10 @@ func LoadConf() {
 	dir, ok := c["work-dir"]
 	if ok == true {
 		workDir = dir.(string)
+	}
+	gs, ok := c["gs"]
+	if ok == true {
+		gsFile = gs.(string) + workDir + "/" + voiceFile
 	}
 
 }
