@@ -22,7 +22,7 @@ import (
 var conf = map[string]string{}
 
 var (
-	gsFile              string // URI, target file on Google Cloud Storage
+	gsFileURI           string // URI, target file on Google Cloud Storage
 	projectId 	        string // GCP project ID
 	bucketName			string // Bucket Name of Google Cloud Storage
 	workDir				string // working directory name on Bucket
@@ -41,15 +41,17 @@ func main() {
 	}
 
 	// create response file
-	file, _ := os.Create(fmt.Sprintf("RespText_%s.txt", voiceFileNameNonExt))
-	defer file.Close()
+	blankFile, _ := os.Create(fmt.Sprintf("RespText_%s.txt", voiceFileNameNonExt))
+	defer blankFile.Close()
 
-	result = sendGCS(file, gsFile)
+	result = reqCloudSpeechToText(blankFile, gsFileURI)
 	if result != nil {
 		log.Fatalf("failed to sendGCS: %v", result)
 	}
 }
 
+// init 初期処理の実施
+// パラメータ取得, config初期値設定, ローカルconfig取得
 func init() {
 	// get flag
 	var fp string
@@ -62,27 +64,22 @@ func init() {
 
 	// default
 	conf["gs"] = "gs://xxxx/"
+
+	// read a voice file
 	vf, err := filepath.Abs(fp)	// "//User/local/xxxx.flac"
 	if err != nil{
 		log.Println("local File not found")
 		return
 	}
-
 	localFile = vf
-	voiceFile = filepath.Base(vf)
-
-	localConf, _ = filepath.Abs("./conf/config.yaml") //"./conf/config.conf"
-
-	// local.confの読み込み
-	LoadConf()
-
-	// TODO パス絶対値化
-	//apath, _ := filepath.Abs("./conf/local.conf")
-
+	voiceFile = filepath.Base(localFile)
 	voiceFileNameNonExt = getVoiceFileName(voiceFile) // something voice file
+
+	// config.yamlの読み込み
+	LoadConf()
 }
 
-// upload voice file to Google Cloud Storage
+// uploadFile upload voice file to Google Cloud Storage
 func uploadFile() error {
 	f, err := os.Open(localFile)
 	if err != nil{
@@ -105,8 +102,8 @@ func uploadFile() error {
 	return nil
 }
 
-
-func sendGCS(w io.Writer, gcsURI string) error {
+// reqCloudSpeechToText CloudSpeechToTextへのリクエストを実行する
+func reqCloudSpeechToText(w io.Writer, gcsURI string) error {
 	// 空のコンテキストを生成。ゴールーチンのタイムアウト、キャンセルなどの実装に利用する。
 	ctx := context.Background()
 
@@ -137,7 +134,7 @@ func sendGCS(w io.Writer, gcsURI string) error {
 	if err != nil {
 		return err
 	}
-	// Prints the results.
+	// Prints to the results.
 	for _, result := range resp.Results {
 		for _, alt := range result.Alternatives {
 			fmt.Fprintf(w, "\"%v\" (confidence=%3f)\n", alt.Transcript, alt.Confidence)
@@ -162,6 +159,7 @@ func getVoiceFileName(f string) string {
 // load config
 func LoadConf() {
 	var c map[string]interface{}
+	localConf, _ = filepath.Abs("./conf/config.yaml") //"./conf/config.conf"
 	buf, err := ioutil.ReadFile(localConf)
 	if err != nil {
 		log.Printf("%s is not exists", localConf)
@@ -186,7 +184,7 @@ func LoadConf() {
 	}
 	gs, ok := c["gs"]
 	if ok == true {
-		gsFile = gs.(string) + workDir + "/" + voiceFile
+		gsFileURI = gs.(string) + workDir + "/" + voiceFile
 	}
 
 }
