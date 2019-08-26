@@ -46,7 +46,7 @@ func main() {
 
 	result = reqCloudSpeechToText(blankFile, gsFileURI)
 	if result != nil {
-		log.Fatalf("failed to sendGCS: %v", result)
+		log.Fatalf("failed to reqCloudSpeechToText: %v", result)
 	}
 }
 
@@ -149,14 +149,14 @@ func exists(filename string) bool {
 	return err == nil
 }
 
-// ファイルから拡張子を取り除いたファイル名を取得
+// getVoiceFileName ファイルから拡張子を取り除いたファイル名を取得
 func getVoiceFileName(f string) string {
 	slist := strings.Split(f, ".")
 	return slist[0]
 }
 
 
-// load config
+// LoadConf load config
 func LoadConf() {
 	var c map[string]interface{}
 	localConf, _ = filepath.Abs("./conf/config.yaml") //"./conf/config.conf"
