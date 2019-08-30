@@ -58,8 +58,7 @@ func init() {
 	flag.StringVar(&fp, "f", "", "Voice FilePath")
 	flag.Parse()
 	if exists(fp) == false {
-		fmt.Println("Voice File not specified")
-		return
+		log.Fatalf("Voice File not specified")
 	}
 
 	// default
@@ -68,8 +67,7 @@ func init() {
 	// read a voice file
 	vf, err := filepath.Abs(fp)	// "//User/local/xxxx.flac"
 	if err != nil{
-		log.Println("local File not found")
-		return
+		log.Fatalf("local File not found")
 	}
 	localFile = vf
 	voiceFile = filepath.Base(localFile)
@@ -77,6 +75,8 @@ func init() {
 
 	// config.yamlの読み込み
 	LoadConf()
+
+	return
 }
 
 // uploadFile upload voice file to Google Cloud Storage
@@ -92,7 +92,7 @@ func uploadFile() error {
 	if err != nil {
 		log.Fatalf("failed to create GS client: %v", err)
 	}
-	wc := client.Bucket(bucketName).Object(workDir +"/"+ voiceFile).NewWriter(ctx)
+	wc := client.Bucket(bucketName).Object(workDir + voiceFile).NewWriter(ctx)
 	if _, err = io.Copy(wc, f); err != nil {
 		return err
 	}
@@ -159,7 +159,7 @@ func getVoiceFileName(f string) string {
 // LoadConf load config
 func LoadConf() {
 	var c map[string]interface{}
-	localConf, _ = filepath.Abs("./conf/config.yaml") //"./conf/config.conf"
+	localConf, _ = filepath.Abs("./conf/config.yaml") //"./conf/config.yaml"
 	buf, err := ioutil.ReadFile(localConf)
 	if err != nil {
 		log.Printf("%s is not exists", localConf)
@@ -184,7 +184,7 @@ func LoadConf() {
 	}
 	gs, ok := c["gs"]
 	if ok == true {
-		gsFileURI = gs.(string) + workDir + "/" + voiceFile
+		gsFileURI = gs.(string) + workDir + voiceFile
 	}
 
 }
