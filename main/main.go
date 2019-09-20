@@ -28,7 +28,8 @@ var (
 	gsFileURI           string // URI, target file on Google Cloud Storage
 	gsWorkDir			string // working directory name on Bucket
 
-	voiceFile           string // original filename
+	originalFile		string // original file
+	originalFileName    string // original filename
 )
 
 const SAMPLING_RATE_HERTZ = 44100
@@ -42,9 +43,9 @@ func main() {
 	}
 
 	// レスポンスファイル作成
-	voiceFileNameNonExt := getVoiceFileName(voiceFile)
+	voiceFileNameNonExt := getVoiceFileName(originalFileName)
 	textFile := fmt.Sprintf("RespText_%s.txt", voiceFileNameNonExt)
-	respFile, _ := os.Create(textFile)
+	respFile, _ := os.Create(filepath.Dir(filepath.Clean(originalFile)) + "/" + textFile)
 	defer respFile.Close()
 	err = reqCloudSpeechToText(respFile, gsFileURI)
 	if err != nil {
@@ -57,10 +58,10 @@ func main() {
 // パラメータ取得, config初期値設定, ローカルconfig取得
 func init() {
 	// get flag
-	var fp string
-	flag.StringVar(&fp, "f", "", "Voice FilePath")
+//	var fp string
+	flag.StringVar(&originalFile, "f", "", "Voice FilePath")
 	flag.Parse()
-	if exists(fp) == false {
+	if exists(originalFile) == false {
 		log.Fatalf("Voice File not specified")
 	}
 
@@ -68,11 +69,11 @@ func init() {
 	conf["gs"] = "gs://xxxx/"
 
 	// read a voice file
-	vf, err := filepath.Abs(fp)	// "//User/local/xxxx.flac"
+	vf, err := filepath.Abs(originalFile)	// "//User/local/xxxx.flac"
 	if err != nil{
 		log.Fatalf("local voice file not found")
 	}
-	voiceFile = filepath.Base(vf)
+	originalFileName = filepath.Base(vf)
 
 	// ローカルコンフィグファイルの読み込み
 	var c map[string]interface{}
@@ -101,7 +102,7 @@ func init() {
 	}
 	gs, ok := c["gs"]
 	if ok == true {
-		gsFileURI = gs.(string) + gsWorkDir + voiceFile
+		gsFileURI = gs.(string) + gsWorkDir + originalFileName
 	}
 
 	return
@@ -109,7 +110,7 @@ func init() {
 
 // uploadFile upload voice file to Google Cloud Storage
 func uploadFile() error {
-	f, err := os.Open(voiceFile)
+	f, err := os.Open(originalFile)
 	if err != nil{
 		return err
 	}
@@ -120,7 +121,7 @@ func uploadFile() error {
 	if err != nil {
 		log.Fatalf("failed to create GS client: %v", err)
 	}
-	wc := client.Bucket(gsBucketName).Object(gsWorkDir + voiceFile).NewWriter(ctx)
+	wc := client.Bucket(gsBucketName).Object(gsWorkDir + originalFileName).NewWriter(ctx)
 	if _, err = io.Copy(wc, f); err != nil {
 		return err
 	}
